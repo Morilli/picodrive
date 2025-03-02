@@ -44,21 +44,6 @@ void PicoInit(void)
   PicoDraw2Init();
 }
 
-// to be called once on emu exit
-void PicoExit(void)
-{
-  if (PicoIn.AHW & PAHW_MCD)
-    PicoExitMCD();
-  PicoCartUnload();
-  z80_exit();
-  PsndExit();
-
-  free(Pico.sv.data);
-  Pico.sv.data = NULL;
-  Pico.sv.start = Pico.sv.end = 0;
-  pevt_dump();
-}
-
 void PicoPower(void)
 {
   Pico.m.frame_count = 0;
@@ -225,7 +210,7 @@ void PicoLoopPrepare(void)
   rendstatus_old = -1;
 }
 
-#include "pico_cmn.c"
+#include "pico_cmn.inc"
 
 /* sync z80 to 68k */
 PICO_INTERNAL void PicoSyncZ80(unsigned int m68k_cycles_done)

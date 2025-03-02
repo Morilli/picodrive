@@ -20,26 +20,6 @@ extern "C" {
 // message log
 extern void lprintf(const char *fmt, ...);
 
-// external funcs for Sega/Mega CD
-extern int  mp3_get_bitrate(void *f, int size);
-extern void mp3_start_play(void *f, int pos);
-extern void mp3_update(int *buffer, int length, int stereo);
-
-// this function should write-back d-cache and invalidate i-cache
-// on a mem region [start_addr, end_addr)
-// used by dynarecs
-extern void cache_flush_d_inval_i(void *start_addr, void *end_addr);
-
-// attempt to alloc mem at specified address.
-// alloc anywhere else if that fails (callers should handle that)
-extern void *plat_mmap(unsigned long addr, size_t size, int need_exec, int is_fixed);
-extern void *plat_mremap(void *ptr, size_t oldsize, size_t newsize);
-extern void  plat_munmap(void *ptr, size_t size);
-
-// memory for the dynarec; plat_mem_get_for_drc() can just return NULL
-extern void *plat_mem_get_for_drc(size_t size);
-extern int   plat_mem_set_exec(void *ptr, size_t size);
-
 // this one should handle display mode changes
 extern void emu_video_mode_change(int start_line, int line_count, int is_32cols);
 
@@ -48,7 +28,7 @@ extern void emu_32x_startup(void);
 
 // optional 32X BIOS, should be left NULL if not used
 // must be 256, 2048, 1024 bytes
-extern void *p32x_bios_g, *p32x_bios_m, *p32x_bios_s;
+extern const void *p32x_bios_g, *p32x_bios_m, *p32x_bios_s;
 
 // Pico.c
 #define POPT_EN_FM          (1<< 0) // 00 000x
@@ -65,7 +45,6 @@ extern void *p32x_bios_g, *p32x_bios_m, *p32x_bios_s;
 #define POPT_EN_MCD_CDDA    (1<<11)
 #define POPT_EN_MCD_GFX     (1<<12) // 00 x000
 // unused                   (1<<13)
-#define POPT_EN_SOFTSCALE   (1<<14)
 #define POPT_EN_MCD_RAMCART (1<<15)
 #define POPT_DIS_VDP_FIFO   (1<<16) // 0x 0000
 #define POPT_EN_DRC         (1<<17)
@@ -114,7 +93,6 @@ typedef struct
 extern PicoInterface PicoIn;
 
 void PicoInit(void);
-void PicoExit(void);
 void PicoPower(void);
 int  PicoReset(void);
 void PicoLoopPrepare(void);
@@ -125,6 +103,9 @@ typedef union { int vint; void *vptr; } pint_ret_t;
 void PicoGetInternal(pint_t which, pint_ret_t *ret);
 
 struct PicoEState;
+
+extern void (*PicoInputCallback)(void);
+extern int PicoInputWasRead;
 
 // pico.c
 #define XPCM_BUFFER_SIZE (320+160)
@@ -143,16 +124,8 @@ typedef struct
 } picohw_state;
 extern picohw_state PicoPicohw;
 
-// area.c
-int PicoState(const char *fname, int is_save);
-int PicoStateLoadGfx(const char *fname);
-void *PicoTmpStateSave(void);
-void  PicoTmpStateRestore(void *data);
-extern void (*PicoStateProgressCB)(const char *str);
-
 // cd/cdd.c
 int cdd_load(const char *filename, int type);
-int cdd_unload(void);
 
 // Cart.c
 typedef enum
@@ -175,8 +148,6 @@ int      pm_seek(pm_file *stream, long offset, int whence);
 int      pm_close(pm_file *fp);
 int PicoCartLoad(pm_file *f,unsigned char **prom,unsigned int *psize,int is_sms);
 int PicoCartInsert(unsigned char *rom, unsigned int romsize, const char *carthw_cfg);
-void PicoCartUnload(void);
-extern void (*PicoCartLoadProgressCB)(int percent);
 extern void (*PicoCDLoadProgressCB)(const char *fname, int percent);
 extern int PicoGameLoaded;
 
@@ -263,7 +234,7 @@ enum cd_img_type
 enum media_type_e PicoLoadMedia(const char *filename,
   const char *carthw_cfg_fname,
   const char *(*get_bios_filename)(int *region, const char *cd_fname),
-  void (*do_region_override)(const char *media_filename));
+  void (*do_region_override)(const char *media_filename), enum media_type_e media_type);
 int PicoCdCheck(const char *fname_in, int *pregion);
 
 extern unsigned char media_id_header[0x100];
