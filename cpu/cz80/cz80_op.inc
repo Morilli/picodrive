@@ -1109,7 +1109,7 @@ OP_IN_A_mN:
 #if CZ80_EMULATE_R_EXACTLY
 		zR++;
 #endif
-		#include "cz80_opCB.c"
+		#include "cz80_opCB.inc"
 	}
 
 	OP(0xed):   // ED prefix
@@ -1119,7 +1119,7 @@ ED_PREFIX:
 #if CZ80_EMULATE_R_EXACTLY
 		zR++;
 #endif
-		#include "cz80_opED.c"
+		#include "cz80_opED.inc"
 
 	OP(0xdd):   // DD prefix (IX)
 DD_PREFIX:
@@ -1136,7 +1136,7 @@ XY_PREFIX:
 #if CZ80_EMULATE_R_EXACTLY
 		zR++;
 #endif
-		#include "cz80_opXY.c"
+		#include "cz80_opXY.inc"
 
 #if !CZ80_USE_JUMPTABLE
 }
