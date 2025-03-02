@@ -25,12 +25,6 @@ static int have_bank(u32 base)
 int carthw_ssf2_active;
 unsigned char carthw_ssf2_banks[8];
 
-static carthw_state_chunk carthw_ssf2_state[] =
-{
-  { CHUNK_CARTHW, sizeof(carthw_ssf2_banks), &carthw_ssf2_banks },
-  { 0,            0,                         NULL }
-};
-
 void carthw_ssf2_write8(u32 a, u32 d)
 {
   u32 target, base;
@@ -69,19 +63,6 @@ static void carthw_ssf2_mem_setup(void)
   cpu68k_map_set(m68k_write16_map, 0xa10000, 0xa1ffff, carthw_ssf2_write16, 1);
 }
 
-static void carthw_ssf2_statef(void)
-{
-  int i;
-  for (i = 1; i < 8; i++)
-    carthw_ssf2_write8(0xa130f0 | (i << 1), carthw_ssf2_banks[i]);
-}
-
-static void carthw_ssf2_unload(void)
-{
-  memset(carthw_ssf2_banks, 0, sizeof(carthw_ssf2_banks));
-  carthw_ssf2_active = 0;
-}
-
 void carthw_ssf2_startup(void)
 {
   int i;
@@ -93,9 +74,6 @@ void carthw_ssf2_startup(void)
     carthw_ssf2_banks[i] = i;
 
   PicoCartMemSetup   = carthw_ssf2_mem_setup;
-  PicoLoadStateHook  = carthw_ssf2_statef;
-  PicoCartUnloadHook = carthw_ssf2_unload;
-  carthw_chunks      = carthw_ssf2_state;
   carthw_ssf2_active = 1;
 }
 
@@ -124,12 +102,6 @@ static void carthw_Xin1_do(u32 a, int mask, int shift)
 	cpu68k_map_set(m68k_read16_map, 0x000000, len - 1, Pico.rom + a, 0);
 }
 
-static carthw_state_chunk carthw_Xin1_state[] =
-{
-	{ CHUNK_CARTHW, sizeof(carthw_Xin1_baddr), &carthw_Xin1_baddr },
-	{ 0,            0,                         NULL }
-};
-
 // TODO: test a0, reads, w16
 static void carthw_Xin1_write8(u32 a, u32 d)
 {
@@ -151,19 +123,12 @@ static void carthw_Xin1_reset(void)
 	carthw_Xin1_write8(0xa13000, 0);
 }
 
-static void carthw_Xin1_statef(void)
-{
-	carthw_Xin1_write8(carthw_Xin1_baddr, 0);
-}
-
 void carthw_Xin1_startup(void)
 {
 	elprintf(EL_STATUS, "X-in-1 mapper startup");
 
 	PicoCartMemSetup  = carthw_Xin1_mem_setup;
 	PicoResetHook     = carthw_Xin1_reset;
-	PicoLoadStateHook = carthw_Xin1_statef;
-	carthw_chunks     = carthw_Xin1_state;
 }
 
 
@@ -269,11 +234,6 @@ static void carthw_radica_mem_setup(void)
 	cpu68k_map_set(m68k_read16_map, 0xa10000, 0xa1ffff, carthw_radica_read16, 1);
 }
 
-static void carthw_radica_statef(void)
-{
-	carthw_radica_read16(carthw_Xin1_baddr);
-}
-
 static void carthw_radica_reset(void)
 {
 	carthw_radica_read16(0xa13000);
@@ -285,22 +245,12 @@ void carthw_radica_startup(void)
 
 	PicoCartMemSetup  = carthw_radica_mem_setup;
 	PicoResetHook     = carthw_radica_reset;
-	PicoLoadStateHook = carthw_radica_statef;
-	carthw_chunks     = carthw_Xin1_state;
 }
 
 
 /* Pier Solar. Based on my own research */
 static unsigned char pier_regs[8];
 static unsigned char pier_dump_prot;
-
-static carthw_state_chunk carthw_pier_state[] =
-{
-  { CHUNK_CARTHW,     sizeof(pier_regs),      pier_regs },
-  { CHUNK_CARTHW + 1, sizeof(pier_dump_prot), &pier_dump_prot },
-  { CHUNK_CARTHW + 2, 0,                      NULL }, // filled later
-  { 0,                0,                      NULL }
-};
 
 static void carthw_pier_write8(u32 a, u32 d)
 {
@@ -474,13 +424,9 @@ void carthw_pier_startup(void)
   Pico.sv.data = calloc(1, Pico.sv.size);
   if (!Pico.sv.data)
     Pico.sv.size = 0;
-  carthw_pier_state[2].ptr = eeprom_state;
-  carthw_pier_state[2].size = eeprom_size;
 
   PicoCartMemSetup  = carthw_pier_mem_setup;
   PicoResetHook     = carthw_pier_reset;
-  PicoLoadStateHook = carthw_pier_statef;
-  carthw_chunks     = carthw_pier_state;
 }
 
 /* Simple unlicensed ROM protection emulation */
@@ -610,13 +556,6 @@ void carthw_sprot_new_location(unsigned int a, unsigned int mask, unsigned short
   sprot_item_count++;
 }
 
-static void carthw_sprot_unload(void)
-{
-  free(sprot_items);
-  sprot_items = NULL;
-  sprot_item_count = sprot_item_alloc = 0;
-}
-
 static void carthw_sprot_mem_setup(void)
 {
   int start;
@@ -639,7 +578,6 @@ void carthw_sprot_startup(void)
   elprintf(EL_STATUS, "Prot emu startup");
 
   PicoCartMemSetup   = carthw_sprot_mem_setup;
-  PicoCartUnloadHook = carthw_sprot_unload;
 }
 
 /* Protection emulation for Lion King 3. Credits go to Haze */

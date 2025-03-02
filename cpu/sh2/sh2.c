@@ -9,8 +9,6 @@
 #include <stddef.h>
 
 #include "sh2.h"
-#include "../debug.h"
-#include "compiler.h"
 
 #define I 0xf0
 
@@ -26,10 +24,6 @@ int sh2_init(SH2 *sh2, int is_slave, SH2 *other_sh2)
 	sh2->mult_m68k_to_sh2 = mult_m68k_to_sh2;
 	sh2->mult_sh2_to_m68k = mult_sh2_to_m68k;
 
-	pdb_register_cpu(sh2, PDBCT_SH2, is_slave ? "ssh2" : "msh2");
-#ifdef DRC_SH2
-	ret = sh2_drc_init(sh2);
-#endif
 	return ret;
 }
 
