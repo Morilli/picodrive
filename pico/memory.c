@@ -263,8 +263,14 @@ static port_read_func *port_readers[3] = {
   read_nothing
 };
 
+void (*PicoInputCallback)(void);
+int PicoInputWasRead;
+
 static NOINLINE u32 port_read(int i)
 {
+  PicoInputWasRead = 1;
+  if (PicoInputCallback)
+    PicoInputCallback();
   u32 data_reg = PicoMem.ioports[i + 1];
   u32 ctrl_reg = PicoMem.ioports[i + 4] | 0x80;
   u32 in, out;
