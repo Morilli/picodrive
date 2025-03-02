@@ -355,7 +355,7 @@ void pcd_run_cpus_lockstep(int m68k_cycles)
 #define CPUS_RUN(m68k_cycles) \
   pcd_run_cpus(m68k_cycles)
 
-#include "../pico_cmn.c"
+#include "../pico_cmn.inc"
 
 
 void pcd_prepare_frame(void)

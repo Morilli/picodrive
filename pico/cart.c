@@ -8,72 +8,95 @@
  */
 
 #include "pico_int.h"
-#include "../cpu/debug.h"
-#include "../unzip/unzip.h"
-#include <zlib.h>
+#include <stdint.h>
+#include <emulibc.h>
+
+static const uint32_t crc32tab[256] = {
+	0x00000000, 0x77073096, 0xee0e612c, 0x990951ba,
+	0x076dc419, 0x706af48f, 0xe963a535, 0x9e6495a3,
+	0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
+	0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91,
+	0x1db71064, 0x6ab020f2, 0xf3b97148, 0x84be41de,
+	0x1adad47d, 0x6ddde4eb, 0xf4d4b551, 0x83d385c7,
+	0x136c9856, 0x646ba8c0, 0xfd62f97a, 0x8a65c9ec,
+	0x14015c4f, 0x63066cd9, 0xfa0f3d63, 0x8d080df5,
+	0x3b6e20c8, 0x4c69105e, 0xd56041e4, 0xa2677172,
+	0x3c03e4d1, 0x4b04d447, 0xd20d85fd, 0xa50ab56b,
+	0x35b5a8fa, 0x42b2986c, 0xdbbbc9d6, 0xacbcf940,
+	0x32d86ce3, 0x45df5c75, 0xdcd60dcf, 0xabd13d59,
+	0x26d930ac, 0x51de003a, 0xc8d75180, 0xbfd06116,
+	0x21b4f4b5, 0x56b3c423, 0xcfba9599, 0xb8bda50f,
+	0x2802b89e, 0x5f058808, 0xc60cd9b2, 0xb10be924,
+	0x2f6f7c87, 0x58684c11, 0xc1611dab, 0xb6662d3d,
+	0x76dc4190, 0x01db7106, 0x98d220bc, 0xefd5102a,
+	0x71b18589, 0x06b6b51f, 0x9fbfe4a5, 0xe8b8d433,
+	0x7807c9a2, 0x0f00f934, 0x9609a88e, 0xe10e9818,
+	0x7f6a0dbb, 0x086d3d2d, 0x91646c97, 0xe6635c01,
+	0x6b6b51f4, 0x1c6c6162, 0x856530d8, 0xf262004e,
+	0x6c0695ed, 0x1b01a57b, 0x8208f4c1, 0xf50fc457,
+	0x65b0d9c6, 0x12b7e950, 0x8bbeb8ea, 0xfcb9887c,
+	0x62dd1ddf, 0x15da2d49, 0x8cd37cf3, 0xfbd44c65,
+	0x4db26158, 0x3ab551ce, 0xa3bc0074, 0xd4bb30e2,
+	0x4adfa541, 0x3dd895d7, 0xa4d1c46d, 0xd3d6f4fb,
+	0x4369e96a, 0x346ed9fc, 0xad678846, 0xda60b8d0,
+	0x44042d73, 0x33031de5, 0xaa0a4c5f, 0xdd0d7cc9,
+	0x5005713c, 0x270241aa, 0xbe0b1010, 0xc90c2086,
+	0x5768b525, 0x206f85b3, 0xb966d409, 0xce61e49f,
+	0x5edef90e, 0x29d9c998, 0xb0d09822, 0xc7d7a8b4,
+	0x59b33d17, 0x2eb40d81, 0xb7bd5c3b, 0xc0ba6cad,
+	0xedb88320, 0x9abfb3b6, 0x03b6e20c, 0x74b1d29a,
+	0xead54739, 0x9dd277af, 0x04db2615, 0x73dc1683,
+	0xe3630b12, 0x94643b84, 0x0d6d6a3e, 0x7a6a5aa8,
+	0xe40ecf0b, 0x9309ff9d, 0x0a00ae27, 0x7d079eb1,
+	0xf00f9344, 0x8708a3d2, 0x1e01f268, 0x6906c2fe,
+	0xf762575d, 0x806567cb, 0x196c3671, 0x6e6b06e7,
+	0xfed41b76, 0x89d32be0, 0x10da7a5a, 0x67dd4acc,
+	0xf9b9df6f, 0x8ebeeff9, 0x17b7be43, 0x60b08ed5,
+	0xd6d6a3e8, 0xa1d1937e, 0x38d8c2c4, 0x4fdff252,
+	0xd1bb67f1, 0xa6bc5767, 0x3fb506dd, 0x48b2364b,
+	0xd80d2bda, 0xaf0a1b4c, 0x36034af6, 0x41047a60,
+	0xdf60efc3, 0xa867df55, 0x316e8eef, 0x4669be79,
+	0xcb61b38c, 0xbc66831a, 0x256fd2a0, 0x5268e236,
+	0xcc0c7795, 0xbb0b4703, 0x220216b9, 0x5505262f,
+	0xc5ba3bbe, 0xb2bd0b28, 0x2bb45a92, 0x5cb36a04,
+	0xc2d7ffa7, 0xb5d0cf31, 0x2cd99e8b, 0x5bdeae1d,
+	0x9b64c2b0, 0xec63f226, 0x756aa39c, 0x026d930a,
+	0x9c0906a9, 0xeb0e363f, 0x72076785, 0x05005713,
+	0x95bf4a82, 0xe2b87a14, 0x7bb12bae, 0x0cb61b38,
+	0x92d28e9b, 0xe5d5be0d, 0x7cdcefb7, 0x0bdbdf21,
+	0x86d3d2d4, 0xf1d4e242, 0x68ddb3f8, 0x1fda836e,
+	0x81be16cd, 0xf6b9265b, 0x6fb077e1, 0x18b74777,
+	0x88085ae6, 0xff0f6a70, 0x66063bca, 0x11010b5c,
+	0x8f659eff, 0xf862ae69, 0x616bffd3, 0x166ccf45,
+	0xa00ae278, 0xd70dd2ee, 0x4e048354, 0x3903b3c2,
+	0xa7672661, 0xd06016f7, 0x4969474d, 0x3e6e77db,
+	0xaed16a4a, 0xd9d65adc, 0x40df0b66, 0x37d83bf0,
+	0xa9bcae53, 0xdebb9ec5, 0x47b2cf7f, 0x30b5ffe9,
+	0xbdbdf21c, 0xcabac28a, 0x53b39330, 0x24b4a3a6,
+	0xbad03605, 0xcdd70693, 0x54de5729, 0x23d967bf,
+	0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,
+	0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d,
+};
+
+uint32_t crc32(const uint8_t *p, size_t size)
+{
+	uint32_t crc = ~0;
+	while (size--)
+		crc = (crc >> 8) ^ crc32tab[(crc ^ (*p++)) & 0xFF];
+	return ~crc;
+}
 
 
 static int rom_alloc_size;
 static const char *rom_exts[] = { "bin", "gen", "smd", "iso", "sms", "gg", "sg" };
 
-void (*PicoCartUnloadHook)(void);
 void (*PicoCartMemSetup)(void);
 
-void (*PicoCartLoadProgressCB)(int percent) = NULL;
 void (*PicoCDLoadProgressCB)(const char *fname, int percent) = NULL; // handled in Pico/cd/cd_file.c
 
 int PicoGameLoaded;
 
 static void PicoCartDetect(const char *carthw_cfg);
-
-/* cso struct */
-typedef struct _cso_struct
-{
-  unsigned char in_buff[2*2048];
-  unsigned char out_buff[2048];
-  struct {
-    char          magic[4];
-    unsigned int  unused;
-    unsigned int  total_bytes;
-    unsigned int  total_bytes_high; // ignored here
-    unsigned int  block_size;  // 10h
-    unsigned char ver;
-    unsigned char align;
-    unsigned char reserved[2];
-  } header;
-  unsigned int  fpos_in;  // input file read pointer
-  unsigned int  fpos_out; // pos in virtual decompressed file
-  int block_in_buff;      // block which we have read in in_buff
-  int pad;
-  int index[0];
-}
-cso_struct;
-
-static int uncompress2(void *dest, int destLen, void *source, int sourceLen)
-{
-    z_stream stream;
-    int err;
-
-    stream.next_in = (Bytef*)source;
-    stream.avail_in = (uInt)sourceLen;
-    stream.next_out = dest;
-    stream.avail_out = (uInt)destLen;
-
-    stream.zalloc = NULL;
-    stream.zfree = NULL;
-
-    err = inflateInit2(&stream, -15);
-    if (err != Z_OK) return err;
-
-    err = inflate(&stream, Z_FINISH);
-    if (err != Z_STREAM_END) {
-        inflateEnd(&stream);
-        return err;
-    }
-    //*destLen = stream.total_out;
-
-    return inflateEnd(&stream);
-}
 
 static const char *get_ext(const char *path)
 {
@@ -87,364 +110,6 @@ static const char *get_ext(const char *path)
   if (ext[-1] != '.')
     return "";
   return ext;
-}
-
-struct zip_file {
-  pm_file file;
-  ZIP *zip;
-  struct zipent *entry;
-  z_stream stream;
-  unsigned char inbuf[16384];
-  long start;
-  unsigned int pos;
-};
-
-pm_file *pm_open(const char *path)
-{
-  pm_file *file = NULL;
-  const char *ext;
-  FILE *f;
-
-  if (path == NULL)
-    return NULL;
-
-  ext = get_ext(path);
-  if (strcasecmp(ext, "zip") == 0)
-  {
-    struct zip_file *zfile = NULL;
-    struct zipent *zipentry;
-    ZIP *zipfile;
-    int i, ret;
-
-    zipfile = openzip(path);
-    if (zipfile != NULL)
-    {
-      /* search for suitable file (right extension or large enough file) */
-      while ((zipentry = readzip(zipfile)) != NULL)
-      {
-        ext = get_ext(zipentry->name);
-
-        if (zipentry->uncompressed_size >= 32*1024)
-          goto found_rom_zip;
-
-        for (i = 0; i < sizeof(rom_exts)/sizeof(rom_exts[0]); i++)
-          if (strcasecmp(ext, rom_exts[i]) == 0)
-            goto found_rom_zip;
-      }
-
-      /* zipfile given, but nothing found suitable for us inside */
-      goto zip_failed;
-
-found_rom_zip:
-      zfile = calloc(1, sizeof(*zfile));
-      if (zfile == NULL)
-        goto zip_failed;
-      ret = seekcompresszip(zipfile, zipentry);
-      if (ret != 0)
-        goto zip_failed;
-      ret = inflateInit2(&zfile->stream, -15);
-      if (ret != Z_OK) {
-        elprintf(EL_STATUS, "zip: inflateInit2 %d", ret);
-        goto zip_failed;
-      }
-      zfile->zip = zipfile;
-      zfile->entry = zipentry;
-      zfile->start = ftell(zipfile->fp);
-      zfile->file.file = zfile;
-      zfile->file.size = zipentry->uncompressed_size;
-      zfile->file.type = PMT_ZIP;
-      strncpy(zfile->file.ext, ext, sizeof(zfile->file.ext) - 1);
-      return &zfile->file;
-
-zip_failed:
-      closezip(zipfile);
-      free(zfile);
-      return NULL;
-    }
-  }
-  else if (strcasecmp(ext, "cso") == 0)
-  {
-    cso_struct *cso = NULL, *tmp = NULL;
-    int size;
-    f = fopen(path, "rb");
-    if (f == NULL)
-      goto cso_failed;
-
-#ifdef __GP2X__
-    /* we use our own buffering */
-    setvbuf(f, NULL, _IONBF, 0);
-#endif
-
-    cso = malloc(sizeof(*cso));
-    if (cso == NULL)
-      goto cso_failed;
-
-    if (fread(&cso->header, 1, sizeof(cso->header), f) != sizeof(cso->header))
-      goto cso_failed;
-
-    if (strncmp(cso->header.magic, "CISO", 4) != 0) {
-      elprintf(EL_STATUS, "cso: bad header");
-      goto cso_failed;
-    }
-
-    if (cso->header.block_size != 2048) {
-      elprintf(EL_STATUS, "cso: bad block size (%u)", cso->header.block_size);
-      goto cso_failed;
-    }
-
-    size = ((cso->header.total_bytes >> 11) + 1)*4 + sizeof(*cso);
-    tmp = realloc(cso, size);
-    if (tmp == NULL)
-      goto cso_failed;
-    cso = tmp;
-    elprintf(EL_STATUS, "allocated %i bytes for CSO struct", size);
-
-    size -= sizeof(*cso); // index size
-    if (fread(cso->index, 1, size, f) != size) {
-      elprintf(EL_STATUS, "cso: premature EOF");
-      goto cso_failed;
-    }
-
-    // all ok
-    cso->fpos_in = ftell(f);
-    cso->fpos_out = 0;
-    cso->block_in_buff = -1;
-    file = calloc(1, sizeof(*file));
-    if (file == NULL) goto cso_failed;
-    file->file  = f;
-    file->param = cso;
-    file->size  = cso->header.total_bytes;
-    file->type  = PMT_CSO;
-    return file;
-
-cso_failed:
-    if (cso != NULL) free(cso);
-    if (f != NULL) fclose(f);
-    return NULL;
-  }
-
-  /* not a zip, treat as uncompressed file */
-  f = fopen(path, "rb");
-  if (f == NULL) return NULL;
-
-  file = calloc(1, sizeof(*file));
-  if (file == NULL) {
-    fclose(f);
-    return NULL;
-  }
-  fseek(f, 0, SEEK_END);
-  file->file  = f;
-  file->param = NULL;
-  file->size  = ftell(f);
-  file->type  = PMT_UNCOMPRESSED;
-  strncpy(file->ext, ext, sizeof(file->ext) - 1);
-  fseek(f, 0, SEEK_SET);
-
-#ifdef __GP2X__
-  if (file->size > 0x400000)
-    /* we use our own buffering */
-    setvbuf(f, NULL, _IONBF, 0);
-#endif
-
-  return file;
-}
-
-size_t pm_read(void *ptr, size_t bytes, pm_file *stream)
-{
-  int ret;
-
-  if (stream->type == PMT_UNCOMPRESSED)
-  {
-    ret = fread(ptr, 1, bytes, stream->file);
-  }
-  else if (stream->type == PMT_ZIP)
-  {
-    struct zip_file *z = stream->file;
-
-    if (z->entry->compression_method == 0) {
-      int ret = fread(ptr, 1, bytes, z->zip->fp);
-      z->pos += ret;
-      return ret;
-    }
-
-    z->stream.next_out = ptr;
-    z->stream.avail_out = bytes;
-    while (z->stream.avail_out != 0) {
-      if (z->stream.avail_in == 0) {
-        z->stream.avail_in = fread(z->inbuf, 1, sizeof(z->inbuf), z->zip->fp);
-        if (z->stream.avail_in == 0)
-          break;
-        z->stream.next_in = z->inbuf;
-      }
-      ret = inflate(&z->stream, Z_NO_FLUSH);
-      if (ret == Z_STREAM_END)
-        break;
-      if (ret != Z_OK) {
-        elprintf(EL_STATUS, "zip: inflate: %d", ret);
-        return 0;
-      }
-    }
-    z->pos += bytes - z->stream.avail_out;
-    return bytes - z->stream.avail_out;
-  }
-  else if (stream->type == PMT_CSO)
-  {
-    cso_struct *cso = stream->param;
-    int read_pos, read_len, out_offs, rret;
-    int block = cso->fpos_out >> 11;
-    int index = cso->index[block];
-    int index_end = cso->index[block+1];
-    unsigned char *out = ptr, *tmp_dst;
-
-    ret = 0;
-    while (bytes != 0)
-    {
-      out_offs = cso->fpos_out&0x7ff;
-      if (out_offs == 0 && bytes >= 2048)
-           tmp_dst = out;
-      else tmp_dst = cso->out_buff;
-
-      read_pos = (index&0x7fffffff) << cso->header.align;
-
-      if (index < 0) {
-        if (read_pos != cso->fpos_in)
-          fseek(stream->file, read_pos, SEEK_SET);
-        rret = fread(tmp_dst, 1, 2048, stream->file);
-        cso->fpos_in = read_pos + rret;
-        if (rret != 2048) break;
-      } else {
-        read_len = (((index_end&0x7fffffff) << cso->header.align) - read_pos) & 0xfff;
-        if (block != cso->block_in_buff)
-        {
-          if (read_pos != cso->fpos_in)
-            fseek(stream->file, read_pos, SEEK_SET);
-          rret = fread(cso->in_buff, 1, read_len, stream->file);
-          cso->fpos_in = read_pos + rret;
-          if (rret != read_len) {
-            elprintf(EL_STATUS, "cso: read failed @ %08x", read_pos);
-            break;
-          }
-          cso->block_in_buff = block;
-        }
-        rret = uncompress2(tmp_dst, 2048, cso->in_buff, read_len);
-        if (rret != 0) {
-          elprintf(EL_STATUS, "cso: uncompress failed @ %08x with %i", read_pos, rret);
-          break;
-        }
-      }
-
-      rret = 2048;
-      if (out_offs != 0 || bytes < 2048) {
-        //elprintf(EL_STATUS, "cso: unaligned/nonfull @ %08x, offs=%i, len=%u", cso->fpos_out, out_offs, bytes);
-        if (bytes < rret) rret = bytes;
-        if (2048 - out_offs < rret) rret = 2048 - out_offs;
-        memcpy(out, tmp_dst + out_offs, rret);
-      }
-      ret += rret;
-      out += rret;
-      cso->fpos_out += rret;
-      bytes -= rret;
-      block++;
-      index = index_end;
-      index_end = cso->index[block+1];
-    }
-  }
-  else
-    ret = 0;
-
-  return ret;
-}
-
-int pm_seek(pm_file *stream, long offset, int whence)
-{
-  if (stream->type == PMT_UNCOMPRESSED)
-  {
-    fseek(stream->file, offset, whence);
-    return ftell(stream->file);
-  }
-  else if (stream->type == PMT_ZIP)
-  {
-    struct zip_file *z = stream->file;
-    unsigned int pos = z->pos;
-    int ret;
-
-    switch (whence)
-    {
-      case SEEK_CUR: pos += offset; break;
-      case SEEK_SET: pos  = offset; break;
-      case SEEK_END: pos  = stream->size - offset; break;
-    }
-    if (z->entry->compression_method == 0) {
-      ret = fseek(z->zip->fp, z->start + pos, SEEK_SET);
-      if (ret == 0)
-        return (z->pos = pos);
-      return -1;
-    }
-    offset = pos - z->pos;
-    if (pos < z->pos) {
-      // full decompress from the start
-      fseek(z->zip->fp, z->start, SEEK_SET);
-      z->stream.avail_in = 0;
-      z->stream.next_in = z->inbuf;
-      inflateReset(&z->stream);
-      z->pos = 0;
-      offset = pos;
-    }
-
-    if (PicoMessage != NULL && offset > 4 * 1024 * 1024)
-      PicoMessage("Decompressing data...");
-
-    while (offset > 0) {
-      char buf[16 * 1024];
-      size_t l = offset > sizeof(buf) ? sizeof(buf) : offset;
-      ret = pm_read(buf, l, stream);
-      if (ret != l)
-        break;
-      offset -= l;
-    }
-    return z->pos;
-  }
-  else if (stream->type == PMT_CSO)
-  {
-    cso_struct *cso = stream->param;
-    switch (whence)
-    {
-      case SEEK_CUR: cso->fpos_out += offset; break;
-      case SEEK_SET: cso->fpos_out  = offset; break;
-      case SEEK_END: cso->fpos_out  = cso->header.total_bytes - offset; break;
-    }
-    return cso->fpos_out;
-  }
-  else
-    return -1;
-}
-
-int pm_close(pm_file *fp)
-{
-  int ret = 0;
-
-  if (fp == NULL) return EOF;
-
-  if (fp->type == PMT_UNCOMPRESSED)
-  {
-    fclose(fp->file);
-  }
-  else if (fp->type == PMT_ZIP)
-  {
-    struct zip_file *z = fp->file;
-    inflateEnd(&z->stream);
-    closezip(z->zip);
-  }
-  else if (fp->type == PMT_CSO)
-  {
-    free(fp->param);
-    fclose(fp->file);
-  }
-  else
-    ret = EOF;
-
-  free(fp);
-  return ret;
 }
 
 // byteswap, data needs to be int aligned, src can match dst
@@ -519,13 +184,17 @@ static unsigned char *PicoCartAlloc(int filesize, int is_sms)
     // align to 512K for memhandlers
     rom_alloc_size = (filesize + 0x7ffff) & ~0x7ffff;
   }
+  if (rom_alloc_size < 0x400000) {
+	// sh2 memory mapping assumes that there's at least this much readable memory
+	// The comment in that code is `0x3fffff; // FIXME`, but I guess it was never fixed
+    rom_alloc_size = 0x400000;
+  }
 
   if (rom_alloc_size - filesize < 4)
     rom_alloc_size += 4; // padding for out-of-bound exec protection
 
   // Allocate space for the rom plus padding
-  // use special address for 32x dynarec
-  rom = plat_mmap(0x02000000, rom_alloc_size, 0, 0);
+  rom = alloc_sealed(rom_alloc_size);
   return rom;
 }
 
@@ -548,28 +217,9 @@ int PicoCartLoad(pm_file *f,unsigned char **prom,unsigned int *psize,int is_sms)
     return 2;
   }
 
-  if (PicoCartLoadProgressCB != NULL)
-  {
-    // read ROM in blocks, just for fun
-    int ret;
-    unsigned char *p = rom;
-    bytes_read=0;
-    do
-    {
-      int todo = size - bytes_read;
-      if (todo > 256*1024) todo = 256*1024;
-      ret = pm_read(p,todo,f);
-      bytes_read += ret;
-      p += ret;
-      PicoCartLoadProgressCB(bytes_read * 100 / size);
-    }
-    while (ret > 0);
-  }
-  else
-    bytes_read = pm_read(rom,size,f); // Load up the rom
+  bytes_read = pm_read(rom,size,f); // Load up the rom
   if (bytes_read <= 0) {
     elprintf(EL_STATUS, "read failed");
-    plat_munmap(rom, rom_alloc_size);
     return 3;
   }
 
@@ -622,20 +272,12 @@ int PicoCartInsert(unsigned char *rom, unsigned int romsize, const char *carthw_
     SRam.data = NULL;
   }
 
-  if (PicoCartUnloadHook != NULL) {
-    PicoCartUnloadHook();
-    PicoCartUnloadHook = NULL;
-  }
-  pdb_cleanup();
-
   PicoAHW &= PAHW_MCD|PAHW_SMS;
 
   PicoCartMemSetup = NULL;
   PicoDmaHook = NULL;
   PicoResetHook = NULL;
   PicoLineHook = NULL;
-  PicoLoadStateHook = NULL;
-  carthw_chunks = NULL;
 
   if (!(PicoAHW & (PAHW_MCD|PAHW_SMS)))
     PicoCartDetect(carthw_cfg);
@@ -663,35 +305,6 @@ int PicoCartInsert(unsigned char *rom, unsigned int romsize, const char *carthw_
   return 0;
 }
 
-int PicoCartResize(int newsize)
-{
-  void *tmp = plat_mremap(Pico.rom, rom_alloc_size, newsize);
-  if (tmp == NULL)
-    return -1;
-
-  Pico.rom = tmp;
-  rom_alloc_size = newsize;
-  return 0;
-}
-
-void PicoCartUnload(void)
-{
-  if (PicoCartUnloadHook != NULL) {
-    PicoCartUnloadHook();
-    PicoCartUnloadHook = NULL;
-  }
-
-  if (PicoAHW & PAHW_32X)
-    PicoUnload32x();
-
-  if (Pico.rom != NULL) {
-    SekFinishIdleDet();
-    plat_munmap(Pico.rom, rom_alloc_size);
-    Pico.rom = NULL;
-  }
-  PicoGameLoaded = 0;
-}
-
 static unsigned int rom_crc32(void)
 {
   unsigned int crc;
@@ -699,7 +312,7 @@ static unsigned int rom_crc32(void)
 
   // have to unbyteswap for calculation..
   Byteswap(Pico.rom, Pico.rom, Pico.romsize);
-  crc = crc32(0, Pico.rom, Pico.romsize);
+  crc = crc32(Pico.rom, Pico.romsize);
   Byteswap(Pico.rom, Pico.rom, Pico.romsize);
   return crc;
 }
@@ -776,7 +389,7 @@ static int is_expr(const char *expr, char **pr)
   return 1;
 }
 
-#include "carthw_cfg.c"
+#include "carthw_cfg.inc"
 
 static void parse_carthw(const char *carthw_cfg, int *fill_sram)
 {
@@ -1094,5 +707,3 @@ static void PicoCartDetect(const char *carthw_cfg)
   if (rom_strcmp(0x1f0, "EUROPE") == 0 || rom_strcmp(0x1f0, "Europe") == 0)
     *(int *) (Pico.rom + 0x1f0) = 0x20204520;
 }
-
-// vim:shiftwidth=2:expandtab

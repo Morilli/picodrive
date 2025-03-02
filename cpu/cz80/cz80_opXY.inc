@@ -769,7 +769,7 @@ switch (Opcode)
 #if CZ80_EMULATE_R_EXACTLY
 		zR++;
 #endif
-		#include "cz80_opXYCB.c"
+		#include "cz80_opXYCB.inc"
 	}
 
 	OPXY(0xed): // ED prefix

@@ -232,7 +232,7 @@ static inline unsigned char picodrive_read(unsigned short a)
 INT32 Cz80_Exec(cz80_struc *CPU, INT32 cycles)
 {
 #if CZ80_USE_JUMPTABLE
-#include "cz80jmp.c"
+#include "cz80jmp.inc"
 #endif
 
 	FPTR PC;
@@ -264,7 +264,7 @@ Cz80_Exec_nocheck:
 #if CZ80_EMULATE_R_EXACTLY
 			zR++;
 #endif
-			#include "cz80_op.c"
+			#include "cz80_op.inc"
 		}
 
 		if (afterEI)
