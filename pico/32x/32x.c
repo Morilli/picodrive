@@ -193,17 +193,6 @@ void PicoPower32x(void)
   Pico32x.vdp_regs[0x0a/2] = P32XV_VBLK|P32XV_PEN;
 }
 
-void PicoUnload32x(void)
-{
-  sh2_finish(&msh2);
-  sh2_finish(&ssh2);
-  if (Pico32xMem != NULL)
-    plat_munmap(Pico32xMem, sizeof(*Pico32xMem));
-  Pico32xMem = NULL;
-
-  PicoIn.AHW &= ~PAHW_32X;
-}
-
 void PicoReset32x(void)
 {
   if (PicoIn.AHW & PAHW_32X) {
@@ -566,7 +555,7 @@ void sync_sh2s_lockstep(unsigned int m68k_target)
 
 #define PICO_32X
 #define PICO_CD
-#include "../pico_cmn.c"
+#include "../pico_cmn.inc"
 
 void PicoFrame32x(void)
 {

@@ -38,9 +38,7 @@
 #ifndef _HW_CDD_
 #define _HW_CDD_
 
-#ifdef USE_LIBTREMOR
-#include "tremor/ivorbisfile.h"
-#endif
+#include <stdint.h>
 
 /* CDD status */
 #define NO_DISC  0x00
@@ -60,15 +58,9 @@
 /* CD track */
 typedef struct
 {
-  char *fname;
-  void *fd;
-#ifdef USE_LIBTREMOR
-  OggVorbis_File vf;
-#endif
-  int offset;
   int start;
   int end;
-} track_t; 
+} track_t;
 
 /* CD TOC */
 typedef struct
@@ -76,24 +68,27 @@ typedef struct
   int end;
   int last;
   track_t tracks[CD_MAX_TRACKS];
-} toc_t; 
+} toc_t;
 
 /* CDD hardware */
 typedef struct
 {
-  uint32 cycles;
-  uint32 latency;
+  uint32_t cycles;
+  uint32_t latency;
   int loaded;
   int index;
   int lba;
   int scanOffset;
   int volume;
-  uint8 status;
-  uint16 sectorSize;
+  int sampleOffset;
+  int sampleLba;
+  uint8_t status;
   toc_t toc;
-  int16 audio[2];
-} cdd_t; 
+  int16_t audio[2];
+} cdd_t;
 
 extern cdd_t cdd;
+
+extern void (*CDReadSector)(int lba, void *dest, int audio);
 
 #endif

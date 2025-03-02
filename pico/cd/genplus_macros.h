@@ -14,11 +14,3 @@
 
 #define READ_BYTE(BASE, ADDR) (BASE)[MEM_BE2(ADDR)]
 #define WRITE_BYTE(BASE, ADDR, VAL) (BASE)[MEM_BE2(ADDR)] = (VAL)
-
-#define load_param(param, size) \
-  memcpy(param, &state[bufferptr], size); \
-  bufferptr += size;
-  
-#define save_param(param, size) \
-  memcpy(&state[bufferptr], param, size); \
-  bufferptr += size;

@@ -47,7 +47,7 @@ DRC_DECLARE_SR;
 
 static const char str_mars[] = "MARS";
 
-void *p32x_bios_g, *p32x_bios_m, *p32x_bios_s;
+const void *p32x_bios_g, *p32x_bios_m, *p32x_bios_s;
 struct Pico32xMem *Pico32xMem;
 
 static void bank_switch_rom_68k(int b);
@@ -2296,7 +2296,8 @@ void PicoMemSetup32x(void)
   unsigned int rs;
   int i;
 
-  Pico32xMem = plat_mmap(0x06000000, sizeof(*Pico32xMem), 0, 0);
+  if (!Pico32xMem)
+  	Pico32xMem = malloc(sizeof(*Pico32xMem));
   if (Pico32xMem == NULL) {
     elprintf(EL_STATUS, "OOM");
     return;
