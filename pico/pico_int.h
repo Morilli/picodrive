@@ -525,8 +525,6 @@ typedef struct
   unsigned char bram[0x2000];			// 110200: 8K
   struct mcd_misc m;				// 112200: misc
   struct mcd_pcm pcm;				// 112240:
-  void *cdda_stream;
-  int cdda_type;
   int pcm_mixbuf[PCM_MIXBUF_LEN * 2];
   int pcm_mixpos;
   char pcm_mixbuf_dirty;
@@ -643,22 +641,10 @@ struct Pico32xMem
   unsigned       pwm_index[2];          // ringbuffer index for pwm_fifo
 };
 
-// area.c
-extern void (*PicoLoadStateHook)(void);
-
-typedef struct {
-	int chunk;
-	int size;
-	void *ptr;
-} carthw_state_chunk;
-extern carthw_state_chunk *carthw_chunks;
-#define CHUNK_CARTHW 64
-
 // cart.c
 extern int PicoCartResize(int newsize);
 extern void Byteswap(void *dst, const void *src, int len);
 extern void (*PicoCartMemSetup)(void);
-extern void (*PicoCartUnloadHook)(void);
 
 // debug.c
 int CM_compareRun(int cyc, int is_sub);
@@ -701,9 +687,6 @@ PICO_INTERNAL void PicoMemSetupPico(void);
 // cd/cdc.c
 void cdc_init(void);
 void cdc_reset(void);
-int  cdc_context_save(unsigned char *state);
-int  cdc_context_load(unsigned char *state);
-int  cdc_context_load_old(unsigned char *state);
 void cdc_dma_update(void);
 int  cdc_decoder_update(unsigned char header[4]);
 void cdc_reg_w(unsigned char data);
@@ -712,11 +695,8 @@ unsigned short cdc_host_r(void);
 
 // cd/cdd.c
 void cdd_reset(void);
-int cdd_context_save(unsigned char *state);
-int cdd_context_load(unsigned char *state);
-int cdd_context_load_old(unsigned char *state);
 void cdd_read_data(unsigned char *dst);
-void cdd_read_audio(unsigned int samples);
+void cdd_read_audio(short *buffer, unsigned int samples);
 void cdd_update(void);
 void cdd_process(void);
 
@@ -727,8 +707,6 @@ int load_cd_image(const char *cd_img_name, int *type);
 void gfx_init(void);
 void gfx_start(unsigned int base);
 void gfx_update(unsigned int cycles);
-int gfx_context_save(unsigned char *state);
-int gfx_context_load(const unsigned char *state);
 
 // cd/gfx_dma.c
 void DmaSlowCell(unsigned int source, unsigned int a, int len, unsigned char inc);
@@ -817,9 +795,6 @@ PICO_INTERNAL void SekInitS68k(void);
 PICO_INTERNAL int  SekResetS68k(void);
 PICO_INTERNAL int  SekInterruptS68k(int irq);
 void SekInterruptClearS68k(int irq);
-
-// sound/sound.c
-extern short cdda_out_buffer[2*1152];
 
 void cdda_start_play(int lba_base, int lba_offset, int lb_len);
 
@@ -944,9 +919,7 @@ void Pico32xInit(void);
 void PicoPower32x(void);
 void PicoReset32x(void);
 void Pico32xStartup(void);
-void PicoUnload32x(void);
 void PicoFrame32x(void);
-void Pico32xStateLoaded(int is_early);
 void p32x_sync_sh2s(unsigned int m68k_target);
 void p32x_sync_other_sh2(SH2 *sh2, unsigned int m68k_target);
 void p32x_update_irls(SH2 *active_sh2, unsigned int m68k_cycles);
@@ -1026,7 +999,6 @@ void REGPARM(3) sh2_peripheral_write32(unsigned int a, unsigned int d, SH2 *sh2)
 #define PicoPower32x()
 #define PicoReset32x()
 #define PicoFrame32x()
-#define PicoUnload32x()
 #define Pico32xStateLoaded()
 #define FinalizeLine32xRGB555 NULL
 #define p32x_pwm_update(...)

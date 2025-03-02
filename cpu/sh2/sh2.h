@@ -106,7 +106,7 @@ int  sh2_execute_interpreter(SH2 *sh2c, int cycles);
 
 static __inline void sh2_execute_prepare(SH2 *sh2, int use_drc)
 {
-  sh2->run = use_drc ? sh2_execute_drc : sh2_execute_interpreter;
+  sh2->run = sh2_execute_interpreter;
 }
 
 static __inline int sh2_execute(SH2 *sh2, int cycles)
