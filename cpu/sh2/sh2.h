@@ -30,15 +30,6 @@ typedef struct SH2_
 	const void	**write8_tab;
 	const void	**write16_tab;
 
-	// drc stuff
-	int		drc_tmp;	// 70
-	int		irq_cycles;
-	void		*p_bios;	// convenience pointers
-	void		*p_da;
-	void		*p_sdram;	// 80
-	void		*p_rom;
-	unsigned int	pdb_io_csum[2];
-
 #define SH2_STATE_RUN   (1 << 0)	// to prevent recursion
 #define SH2_STATE_SLEEP (1 << 1)
 #define SH2_STATE_CPOLL (1 << 2)	// polling comm regs

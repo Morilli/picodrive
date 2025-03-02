@@ -27,28 +27,10 @@
  */
 
 #include <pico/pico_int.h>
-#include <cpu/drc/cmn.h>
-#include "compiler.h"
 
 svp_t *svp = NULL;
 int PicoSVPCycles = 850; // cycles/line, just a guess
 static int svp_dyn_ready = 0;
-
-/* save state stuff */
-typedef enum {
-	CHUNK_IRAM = CHUNK_CARTHW,
-	CHUNK_DRAM,
-	CHUNK_SSP
-} chunk_name_e;
-
-static carthw_state_chunk svp_states[] =
-{
-	{ CHUNK_IRAM, 0x800,                 NULL },
-	{ CHUNK_DRAM, sizeof(svp->dram),     NULL },
-	{ CHUNK_SSP,  sizeof(svp->ssp1601) - sizeof(svp->ssp1601.drc),  NULL },
-	{ 0,          0,                     NULL }
-};
-
 
 static void PicoSVPReset(void)
 {
@@ -122,14 +104,6 @@ void PicoSVPInit(void)
 #endif
 }
 
-static void PicoSVPExit(void)
-{
-#ifdef _SVP_DRC
-	ssp1601_dyn_exit();
-#endif
-}
-
-
 void PicoSVPStartup(void)
 {
 	int ret;
@@ -160,13 +134,6 @@ void PicoSVPStartup(void)
 	PicoDmaHook = PicoSVPDma;
 	PicoResetHook = PicoSVPReset;
 	PicoLineHook = PicoSVPLine;
-	PicoCartUnloadHook = PicoSVPExit;
-
-	// save state stuff
-	svp_states[0].ptr = svp->iram_rom;
-	svp_states[1].ptr = svp->dram;
-	svp_states[2].ptr = &svp->ssp1601;
-	carthw_chunks = svp_states;
 	PicoAHW |= PAHW_SVP;
 }
 

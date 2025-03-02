@@ -53,19 +53,6 @@ void PicoInit(void)
   PicoDraw2Init();
 }
 
-// to be called once on emu exit
-void PicoExit(void)
-{
-  if (PicoAHW & PAHW_MCD)
-    PicoExitMCD();
-  PicoCartUnload();
-  z80_exit();
-
-  if (Pico.sv.data)
-    free(Pico.sv.data);
-  pevt_dump();
-}
-
 void PicoPower(void)
 {
   Pico.m.frame_count = 0;
@@ -278,7 +265,7 @@ PICO_INTERNAL int CheckDMA(void)
   return burn;
 }
 
-#include "pico_cmn.c"
+#include "pico_cmn.inc"
 
 /* sync z80 to 68k */
 PICO_INTERNAL void PicoSyncZ80(unsigned int m68k_cycles_done)
@@ -353,7 +340,3 @@ void PicoGetInternal(pint_t which, pint_ret_t *r)
     case PI_IS240_LINES: r->vint = Pico.m.pal && (Pico.video.reg[1]&8); break;
   }
 }
-
-// callback to output message from emu
-void (*PicoMessage)(const char *msg)=NULL;
-
